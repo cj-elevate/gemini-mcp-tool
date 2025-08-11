@@ -18,7 +18,7 @@ export async function executeCommand(
     let isResolved = false;
     let lastReportedLength = 0;
     
-    // Only use shell on Windows to avoid injection risks on Unix-like systems
+    // shell only on Windows to mitigate the shell risk for Non-Windows platforms.
     const isWindows = process.platform === 'win32';
 
     if (stdinData) {

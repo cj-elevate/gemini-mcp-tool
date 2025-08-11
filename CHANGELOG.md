@@ -4,7 +4,7 @@
 - windows compatability
 
 ## [1.1.4]
-- skipped version
+- skipped
 
 ## [1.1.3]
 - "gemini reads, claude edits"
