@@ -25,6 +25,7 @@ export async function executeCommand(
       childProcess = spawn(command, args, {
         env: process.env,
         shell: isWindows,
+        windowsHide: isWindows,
         stdio: ['pipe', 'pipe', 'pipe'],
       }) as ChildProcessByStdio<Writable, Readable, Readable>;
 
@@ -36,6 +37,7 @@ export async function executeCommand(
       childProcess = spawn(command, args, {
         env: process.env,
         shell: isWindows,
+        windowsHide: isWindows,
         stdio: ['ignore', 'pipe', 'pipe'],
       }) as ChildProcessByStdio<null, Readable, Readable>;
     }
