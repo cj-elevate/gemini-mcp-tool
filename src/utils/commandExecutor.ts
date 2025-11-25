@@ -1,41 +1,48 @@
-import { spawn } from "child_process";
+import { ChildProcessByStdio, spawn } from "child_process";
+import { Readable, Writable } from "stream";
 import { Logger } from "./logger.js";
 
-/**
- * Execute a command with platform-specific handling
- *
- * Security Note:
- * - On Windows, shell: true is required to find .cmd/.bat files
- * - Arguments are passed as an array (not concatenated strings) to prevent injection
- * - Command name is hardcoded (not user-controlled)
- * - All args are validated by Zod schemas before reaching this function
- */
 export async function executeCommand(
   command: string,
   args: string[],
-  onProgress?: (newOutput: string) => void
+  onProgress?: (newOutput: string) => void,
+  stdinData?: string
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const startTime = Date.now();
     Logger.commandExecution(command, args, startTime);
 
-    // Platform-specific shell configuration
-    // Windows: shell: true required for .cmd/.bat files (gemini.cmd)
-    // macOS/Linux: shell: false for security (direct executable)
-    const useShell = process.platform === 'win32';
-
-    const childProcess = spawn(command, args, {
-      env: process.env,
-      shell: useShell,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
+    let childProcess: ChildProcessByStdio<Writable | null, Readable, Readable>;
     let stdout = "";
     let stderr = "";
     let isResolved = false;
     let lastReportedLength = 0;
     
-    childProcess.stdout.on("data", (data) => {
+    // shell only on Windows to mitigate the shell risk for Non-Windows platforms.
+    const isWindows = process.platform === 'win32';
+
+    if (stdinData) {
+      childProcess = spawn(command, args, {
+        env: process.env,
+        shell: isWindows,
+        windowsHide: isWindows,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }) as ChildProcessByStdio<Writable, Readable, Readable>;
+
+      if (childProcess.stdin) {
+        childProcess.stdin.write(stdinData);
+        childProcess.stdin.end();
+      }
+    } else {
+      childProcess = spawn(command, args, {
+        env: process.env,
+        shell: isWindows,
+        windowsHide: isWindows,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }) as ChildProcessByStdio<null, Readable, Readable>;
+    }
+
+    childProcess.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
       
       // Report new content if callback provided
@@ -46,9 +53,8 @@ export async function executeCommand(
       }
     });
 
-
     // CLI level errors
-    childProcess.stderr.on("data", (data) => {
+    childProcess.stderr.on("data", (data: Buffer) => {
       stderr += data.toString();
       // find RESOURCE_EXHAUSTED when gemini-2.5-pro quota is exceeded
       if (stderr.includes("RESOURCE_EXHAUSTED")) {
@@ -72,14 +78,14 @@ export async function executeCommand(
         Logger.error(`Gemini Quota Error: ${JSON.stringify(errorJson, null, 2)}`);
       }
     });
-    childProcess.on("error", (error) => {
+    childProcess.on("error", (error: Error) => {
       if (!isResolved) {
         isResolved = true;
         Logger.error(`Process error:`, error);
         reject(new Error(`Failed to spawn command: ${error.message}`));
       }
     });
-    childProcess.on("close", (code) => {
+    childProcess.on("close", (code: number | null) => {
       if (!isResolved) {
         isResolved = true;
         if (code === 0) {

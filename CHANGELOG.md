@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [1.1.5]
+- windows compatibility
+
+## [1.1.4]
+- skipped
 
 ## [1.1.3]
 - "gemini reads, claude edits"
