@@ -1,5 +1,5 @@
 
-# Gemini MCP Tool
+# Gemini MCP Tool (Enhanced Fork)
 
 <div align="center">
 
@@ -8,12 +8,32 @@
 [![npm downloads](https://img.shields.io/npm/dt/gemini-mcp-tool)](https://www.npmjs.com/package/gemini-mcp-tool)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Open Source](https://img.shields.io/badge/Open%20Source-❤️-red.svg)](https://github.com/jamubc/gemini-mcp-tool)
+[![Windows](https://img.shields.io/badge/Windows-Multi--Drive%20Support-0078D6?logo=windows)](https://github.com/cj-elevate/gemini-mcp-tool)
 
 </div>
 
-> 📚 **[View Full Documentation](https://jamubc.github.io/gemini-mcp-tool/)** - Search me!, Examples, FAQ, Troubleshooting, Best Practices
+> **This fork adds Windows multi-drive support** - access files on C:/, D:/, E:/ drives seamlessly with the new `workingDirectory` parameter.
 
-This is a simple Model Context Protocol (MCP) server that allows AI assistants to interact with the [Gemini CLI](https://github.com/google-gemini/gemini-cli). It enables the AI to leverage the power of Gemini's massive token window for large analysis, especially with large files and codebases using the `@` syntax for direction.
+This is an enhanced fork of [jamubc/gemini-mcp-tool](https://github.com/jamubc/gemini-mcp-tool) - an MCP server that allows AI assistants to interact with the [Gemini CLI](https://github.com/google-gemini/gemini-cli). It enables the AI to leverage Gemini's massive token window for large file analysis.
+
+## What This Fork Adds
+
+| Feature | Description |
+|---------|-------------|
+| **Windows Multi-Drive Access** | New `workingDirectory` parameter lets you access any drive (C:/, D:/, E:/) |
+| **Windows Compatibility** | Fixed `shell: true` for proper .cmd execution |
+| **Modern CLI Support** | Uses positional prompts + `-y` flag (fixes deprecated `-p` flag) |
+
+### Quick Example
+```javascript
+// Access files on C: drive
+ask-gemini({ prompt: "Analyze C:/Users/Me/project", workingDirectory: "C:/" })
+
+// Access files on D: drive
+ask-gemini({ prompt: "Review @D:/code/main.ts", workingDirectory: "D:/" })
+```
+
+This solves the Windows multi-drive limitation that no other MCP solution addresses.
 
 - Ask gemini natural questions, through claude or Brainstorm new ideas in a party of 3!
 
@@ -104,42 +124,6 @@ If you installed globally, use this configuration instead:
   - **Linux**: `~/.config/claude/claude_desktop_config.json`
 
 After updating the configuration, restart your terminal session.
-
-## Windows Multi-Drive Support
-
-This fork includes enhanced Windows support:
-
-### Windows Compatibility Fixes
-- Uses `shell: true` for proper `.cmd` file execution
-- Uses positional prompts instead of deprecated `-p` flag
-- Adds `-y` flag for non-interactive YOLO mode
-
-### Cross-Drive Access with `workingDirectory`
-
-On Windows, Gemini CLI locks its workspace to the launch directory. This fork adds a `workingDirectory` parameter to access files on any drive:
-
-```javascript
-// Access C: drive files
-ask-gemini({ prompt: "List C:/Users/Me/Documents", workingDirectory: "C:/" })
-
-// Access D: drive files
-ask-gemini({ prompt: "Analyze @D:/project/main.ts", workingDirectory: "D:/" })
-
-// Access E: drive files
-ask-gemini({ prompt: "Review E:/data/config.json", workingDirectory: "E:/" })
-```
-
-This solves the Windows multi-drive limitation that no other solution addresses.
-
-### Installation (Windows Enhanced Version)
-
-```bash
-# Use this fork directly
-claude mcp add gemini-cli -- node D:/path/to/gemini-mcp-tool/dist/index.js
-
-# Or install from GitHub
-npm install github:cj-elevate/gemini-mcp-tool
-```
 
 ## Example Workflow
 
