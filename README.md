@@ -105,6 +105,42 @@ If you installed globally, use this configuration instead:
 
 After updating the configuration, restart your terminal session.
 
+## Windows Multi-Drive Support
+
+This fork includes enhanced Windows support:
+
+### Windows Compatibility Fixes
+- Uses `shell: true` for proper `.cmd` file execution
+- Uses positional prompts instead of deprecated `-p` flag
+- Adds `-y` flag for non-interactive YOLO mode
+
+### Cross-Drive Access with `workingDirectory`
+
+On Windows, Gemini CLI locks its workspace to the launch directory. This fork adds a `workingDirectory` parameter to access files on any drive:
+
+```javascript
+// Access C: drive files
+ask-gemini({ prompt: "List C:/Users/Me/Documents", workingDirectory: "C:/" })
+
+// Access D: drive files
+ask-gemini({ prompt: "Analyze @D:/project/main.ts", workingDirectory: "D:/" })
+
+// Access E: drive files
+ask-gemini({ prompt: "Review E:/data/config.json", workingDirectory: "E:/" })
+```
+
+This solves the Windows multi-drive limitation that no other solution addresses.
+
+### Installation (Windows Enhanced Version)
+
+```bash
+# Use this fork directly
+claude mcp add gemini-cli -- node D:/path/to/gemini-mcp-tool/dist/index.js
+
+# Or install from GitHub
+npm install github:cj-elevate/gemini-mcp-tool
+```
+
 ## Example Workflow
 
 - **Natural language**: "use gemini to explain index.html", "understand the massive project using gemini", "ask gemini to search for latest news"
