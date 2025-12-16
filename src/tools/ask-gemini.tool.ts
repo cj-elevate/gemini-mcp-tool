@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import { UnifiedTool } from './registry.js';
 import { executeGeminiCLI, processChangeModeOutput } from '../utils/geminiExecutor.js';
-import { 
-  ERROR_MESSAGES, 
+import {
+  ERROR_MESSAGES,
   STATUS_MESSAGES
 } from '../constants.js';
 
 const askGeminiArgsSchema = z.object({
   prompt: z.string().min(1).describe("Analysis request. Use @ syntax to include files (e.g., '@largefile.js explain what this does') or ask general questions"),
-  model: z.string().optional().describe("Optional model to use (e.g., 'gemini-2.5-flash'). If not specified, uses the default model (gemini-2.5-pro)."),
+  // MODEL PARAMETER REMOVED - Always uses gemini-3-pro-preview (hardcoded default)
+  // Auto-fallback to gemini-2.5-flash on quota errors is handled internally
   sandbox: z.boolean().default(false).describe("Use sandbox mode (-s flag) to safely test code changes, execute scripts, or run potentially risky operations in an isolated environment"),
   changeMode: z.boolean().default(false).describe("Enable structured change mode - formats prompts to prevent tool errors and returns structured edit suggestions that Claude can apply directly"),
   chunkIndex: z.union([z.number(), z.string()]).optional().describe("Which chunk to return (1-based)"),
@@ -18,14 +19,22 @@ const askGeminiArgsSchema = z.object({
 
 export const askGeminiTool: UnifiedTool = {
   name: "ask-gemini",
-  description: "model selection [-m], sandbox [-s], and changeMode:boolean for providing edits",
+  description: "Query Gemini (gemini-3-pro-preview). Supports sandbox [-s] and changeMode for structured edits.",
   zodSchema: askGeminiArgsSchema,
   prompt: {
     description: "Execute 'gemini -p <prompt>' to get Gemini AI's response. Supports enhanced change mode for structured edit suggestions.",
   },
   category: 'gemini',
   execute: async (args, onProgress) => {
-    const { prompt, model, sandbox, changeMode, chunkIndex, chunkCacheKey, workingDirectory } = args; if (!prompt?.trim()) { throw new Error(ERROR_MESSAGES.NO_PROMPT_PROVIDED); }
+    const { prompt, sandbox, changeMode, chunkIndex, chunkCacheKey, workingDirectory } = args;
+
+    // MODEL PARAMETER IGNORED - Always use default gemini-3-pro-preview
+    // If caller somehow passes model, we ignore it and log warning
+    if (args.model) {
+      console.warn(`[GEMINI-MCP] WARNING: model parameter "${args.model}" ignored. Always using gemini-3-pro-preview. Remove model parameter from your call.`);
+    }
+
+    if (!prompt?.trim()) { throw new Error(ERROR_MESSAGES.NO_PROMPT_PROVIDED); }
 
     if (changeMode && chunkIndex && chunkCacheKey) {
       return processChangeModeOutput(
@@ -36,15 +45,16 @@ export const askGeminiTool: UnifiedTool = {
       );
     }
 
+    // Always pass undefined for model - executor uses hardcoded default
     const result = await executeGeminiCLI(
       prompt as string,
-      model as string | undefined,
+      undefined, // ALWAYS use default model
       !!sandbox,
       !!changeMode,
       onProgress,
       workingDirectory as string | undefined
     );
-    
+
     if (changeMode) {
       return processChangeModeOutput(
         result,

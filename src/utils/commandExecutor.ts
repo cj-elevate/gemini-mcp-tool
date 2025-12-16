@@ -1,29 +1,63 @@
 import { spawn } from "child_process";
 import { Logger } from "./logger.js";
+import { TIMEOUTS } from "../constants.js";
 
 export async function executeCommand(
   command: string,
   args: string[],
   onProgress?: (newOutput: string) => void,
-  cwd?: string
+  cwd?: string,
+  stdinInput?: string,  // Optional: input to write to stdin (for multiline prompts)
+  timeoutMs?: number    // Optional: custom timeout (defaults based on command)
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const startTime = Date.now();
     Logger.commandExecution(command, args, startTime);
 
+    // Determine timeout: custom > command-specific > default
+    const timeout = timeoutMs ?? (
+      command === "gemini" ? TIMEOUTS.GEMINI_CLI : TIMEOUTS.SIMPLE_COMMAND
+    );
+
+    // Use stdin pipe if stdinInput is provided, otherwise ignore stdin
+    const stdinMode = stdinInput ? "pipe" : "ignore";
+
     const childProcess = spawn(command, args, {
       env: process.env,
       shell: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [stdinMode, "pipe", "pipe"],
       cwd: cwd,
     });
+
+    // Write to stdin if provided (for multiline prompts that get truncated as args)
+    if (stdinInput && childProcess.stdin) {
+      childProcess.stdin.write(stdinInput);
+      childProcess.stdin.end();
+    }
 
     let stdout = "";
     let stderr = "";
     let isResolved = false;
     let lastReportedLength = 0;
-    
-    childProcess.stdout.on("data", (data) => {
+
+    // Timeout handler - kill process if it takes too long
+    const timeoutHandle = setTimeout(() => {
+      if (!isResolved) {
+        isResolved = true;
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        Logger.error(`Process timeout after ${elapsed}s, killing...`);
+        childProcess.kill('SIGTERM');
+        // Force kill after 5 seconds if SIGTERM doesn't work
+        setTimeout(() => {
+          if (!childProcess.killed) {
+            childProcess.kill('SIGKILL');
+          }
+        }, 5000);
+        reject(new Error(`Command timed out after ${timeout / 1000}s. Gemini CLI may be unresponsive.`));
+      }
+    }, timeout);
+
+    childProcess.stdout?.on("data", (data) => {
       stdout += data.toString();
       
       // Report new content if callback provided
@@ -36,7 +70,7 @@ export async function executeCommand(
 
 
     // CLI level errors
-    childProcess.stderr.on("data", (data) => {
+    childProcess.stderr?.on("data", (data) => {
       stderr += data.toString();
       // find RESOURCE_EXHAUSTED when gemini-2.5-pro quota is exceeded
       if (stderr.includes("RESOURCE_EXHAUSTED")) {
@@ -63,6 +97,7 @@ export async function executeCommand(
     childProcess.on("error", (error) => {
       if (!isResolved) {
         isResolved = true;
+        clearTimeout(timeoutHandle);
         Logger.error(`Process error:`, error);
         reject(new Error(`Failed to spawn command: ${error.message}`));
       }
@@ -70,6 +105,7 @@ export async function executeCommand(
     childProcess.on("close", (code) => {
       if (!isResolved) {
         isResolved = true;
+        clearTimeout(timeoutHandle);
         if (code === 0) {
           Logger.commandComplete(startTime, code, stdout.length);
           resolve(stdout.trim());

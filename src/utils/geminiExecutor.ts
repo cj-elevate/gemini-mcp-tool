@@ -89,14 +89,27 @@ ${prompt_processed}
   }
   
   const args = ['-y']; // YOLO mode for non-interactive
-  if (model) { args.push(CLI.FLAGS.MODEL, model); }
+  // Always specify model - use provided or default to gemini-3-pro-preview
+  args.push(CLI.FLAGS.MODEL, model || CLI.DEFAULTS.MODEL);
   if (sandbox) { args.push(CLI.FLAGS.SANDBOX); }
 
-  // Use positional prompt (not -p flag which is deprecated)
-  args.push(prompt_processed);
-  
+  // FIX: Multiline prompts get truncated when passed as positional args with shell:true on Windows
+  // Check if prompt contains newlines - if so, use stdin instead of positional arg
+  const hasNewlines = prompt_processed.includes('\n');
+  let stdinInput: string | undefined;
+
+  if (hasNewlines) {
+    // Use stdin for multiline prompts (Gemini CLI reads from stdin and appends to -p)
+    // We pass an empty -p flag to signal we're providing input via stdin
+    stdinInput = prompt_processed;
+    Logger.debug('Using stdin for multiline prompt', { promptLength: prompt_processed.length, lineCount: prompt_processed.split('\n').length });
+  } else {
+    // Single-line prompts can safely use positional argument
+    args.push(prompt_processed);
+  }
+
   try {
-    return await executeCommand(CLI.COMMANDS.GEMINI, args, onProgress, cwd);
+    return await executeCommand(CLI.COMMANDS.GEMINI, args, onProgress, cwd, stdinInput);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     if (errorMessage.includes(ERROR_MESSAGES.QUOTA_EXCEEDED) && model !== MODELS.FLASH) {
@@ -108,10 +121,13 @@ ${prompt_processed}
         fallbackArgs.push(CLI.FLAGS.SANDBOX);
       }
 
-      // Use positional prompt
-      fallbackArgs.push(prompt_processed);
+      // For fallback, also check for multiline prompts
+      if (!hasNewlines) {
+        fallbackArgs.push(prompt_processed);
+      }
+
       try {
-        const result = await executeCommand(CLI.COMMANDS.GEMINI, fallbackArgs, onProgress, cwd);
+        const result = await executeCommand(CLI.COMMANDS.GEMINI, fallbackArgs, onProgress, cwd, stdinInput);
         Logger.warn(`Successfully executed with ${MODELS.FLASH} fallback.`);
         await sendStatusMessage(STATUS_MESSAGES.FLASH_SUCCESS);
         return result;

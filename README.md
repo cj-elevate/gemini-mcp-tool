@@ -179,6 +179,60 @@ You can use these commands directly in Claude Code's interface (compatibility wi
 - **/ping**: Tests the connection to the server.
   - **`message`** (optional): A message to echo back.
 
+## Troubleshooting
+
+### SyntaxError: Invalid or unexpected token in protos.js
+
+If you see an error like:
+```
+SyntaxError: Invalid or unexpected token
+    at .../@google-cloud/logging/build/protos/protos.js:1975
+```
+
+**Cause:** Corrupted npm cache during Gemini CLI installation.
+
+**Fix:**
+```bash
+# 1. Verify and clean npm cache
+npm cache verify
+
+# 2. Reinstall Gemini CLI
+npm uninstall -g @google/gemini-cli
+npm install -g @google/gemini-cli
+
+# 3. Verify installation
+gemini --version
+```
+
+### Exit code 3221225477 (ACCESS_VIOLATION on Windows)
+
+If the tool crashes with this exit code:
+
+**Cause:** Gemini CLI cannot find its config directory (`~/.gemini/`) because Windows environment variables are missing from the MCP spawn context.
+
+**Fix:** Add these environment variables to your MCP server config:
+```json
+"environment": {
+  "ComSpec": "C:\\WINDOWS\\system32\\cmd.exe",
+  "SystemRoot": "C:\\WINDOWS",
+  "USERPROFILE": "C:\\Users\\YOUR_USERNAME",
+  "HOME": "C:\\Users\\YOUR_USERNAME",
+  "APPDATA": "C:\\Users\\YOUR_USERNAME\\AppData\\Roaming",
+  "LOCALAPPDATA": "C:\\Users\\YOUR_USERNAME\\AppData\\Local"
+}
+```
+
+Then restart the MCP backend:
+- If using master-mcp-proxy: Call `restart_backend` with `backend_id: "gemini-cli"`
+- Otherwise: Restart your Claude Code session
+
+### Gemini CLI works directly but fails through MCP
+
+1. **Check Gemini CLI version:** `gemini --version`
+2. **Test directly:** `gemini -y "say OK"`
+3. **Verify environment variables** are configured (see above)
+4. **Restart MCP backend** after config changes
+
 ## Contributing
 
 Contributions are welcome! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to submit pull requests, report issues, and contribute to the project.

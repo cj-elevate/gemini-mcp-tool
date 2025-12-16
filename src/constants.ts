@@ -26,7 +26,8 @@ export const STATUS_MESSAGES = {
 
 // Models
 export const MODELS = {
-  PRO: "gemini-2.5-pro",
+  PRO: "gemini-3-pro-preview",
+  PRO_25: "gemini-2.5-pro",
   FLASH: "gemini-2.5-flash",
 } as const;
 
@@ -57,6 +58,12 @@ export const PROTOCOL = {
 } as const;
 
 
+// Timeout Constants
+export const TIMEOUTS = {
+  GEMINI_CLI: 300000, // 5 minutes for Gemini CLI responses
+  SIMPLE_COMMAND: 30000, // 30 seconds for simple commands (echo, help)
+} as const;
+
 // CLI Constants
 export const CLI = {
   // Command names
@@ -73,7 +80,7 @@ export const CLI = {
   },
   // Default values
   DEFAULTS: {
-    MODEL: "default", // Fallback model used when no specific model is provided
+    MODEL: "gemini-3-pro-preview", // Default to Gemini 3, fallback to 2.5-flash
     BOOLEAN_TRUE: "true",
     BOOLEAN_FALSE: "false",
   },
