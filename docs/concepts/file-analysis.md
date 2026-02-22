@@ -1,3 +1,9 @@
+---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
+---
 # File Analysis with @ Syntax
 
 One of the most powerful features of Gemini MCP Tool is the ability to analyze files using the `@` syntax.

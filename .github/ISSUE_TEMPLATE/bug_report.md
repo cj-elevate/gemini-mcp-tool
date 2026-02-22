@@ -1,11 +1,14 @@
 ---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
 name: Bug report
 about: Report a bug
-title: ''
+title: 
 labels: bug
-assignees: ''
+assignees: 
 ---
-
 **Describe the bug**
 Clear description of the bug
 

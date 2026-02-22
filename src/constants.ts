@@ -26,7 +26,7 @@ export const STATUS_MESSAGES = {
 
 // Models
 export const MODELS = {
-  PRO: "gemini-3-pro-preview",
+  PRO: "gemini-2.5-pro",
   PRO_25: "gemini-2.5-pro",
   FLASH: "gemini-2.5-flash",
 } as const;
@@ -80,7 +80,7 @@ export const CLI = {
   },
   // Default values
   DEFAULTS: {
-    MODEL: "gemini-3-pro-preview", // Default to Gemini 3, fallback to 2.5-flash
+    MODEL: "gemini-3-pro-preview", // Gemini 3 Pro (CLI v0.29.5 doesn't support 3.1 yet - revisit when CLI updates)
     BOOLEAN_TRUE: "true",
     BOOLEAN_FALSE: "false",
   },

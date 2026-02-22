@@ -1,3 +1,9 @@
+---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
+---
 # Installation
 
 Multiple ways to install Gemini MCP Tool, depending on your needs.

@@ -1,11 +1,14 @@
 ---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
 name: Feature request
 about: Suggest a new feature
-title: ''
+title: 
 labels: enhancement
-assignees: ''
+assignees: 
 ---
-
 **Feature Description**
 What would you like to add?
 

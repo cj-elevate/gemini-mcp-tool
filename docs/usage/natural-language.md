@@ -1,3 +1,9 @@
+---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
+---
 # Natural Language Usage
 
 You don't need to memorize commands - just ask naturally!

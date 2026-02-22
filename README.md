@@ -1,3 +1,10 @@
+---
+type: doc
+doc: readme
+updated: 2026-01-03
+project: gemini-mcp
+area: servers
+---
 
 # Gemini MCP Tool (Enhanced Fork)
 

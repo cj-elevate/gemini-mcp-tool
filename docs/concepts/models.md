@@ -1,3 +1,9 @@
+---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
+---
 # Model Selection
 
 Choose the right Gemini model for your task.

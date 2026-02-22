@@ -1,3 +1,10 @@
+---
+type: doc
+doc: troubleshooting
+updated: 2026-01-03
+project: gemini-mcp
+area: servers
+---
 # Troubleshooting
 
 Common issues and their solutions. Click any issue below to see the detailed solution.

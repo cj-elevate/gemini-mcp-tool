@@ -1,3 +1,9 @@
+---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
+---
 # Sandbox Mode
 
 Execute code safely in an isolated environment.

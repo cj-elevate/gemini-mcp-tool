@@ -1,7 +1,10 @@
 ---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
 layout: funding
 ---
-
 # Support the Development of Gemini MCP Tool
 
 `Gemini MCP Tool is a need-driven project dedicated to being an open-source, free tool for developers working with Google's Gemini models. We are committed to keeping it free and open-source, forever. As the project's complexity grows, so does the costs and time required to sustain it. Your contribution, no matter the size, helps ensure the project's long-term health and allows us to build the features our community needs.`

@@ -1,3 +1,9 @@
+---
+type: note
+updated: 2026-01-03
+area: servers
+project: gemini-mcp
+---
 # Real-World Examples
 
 Practical examples of using Gemini MCP Tool in development workflows.
