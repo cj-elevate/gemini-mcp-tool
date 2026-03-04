@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import { UnifiedTool } from './registry.js';
-import { executeCommand } from '../utils/commandExecutor.js';
 
 const pingArgsSchema = z.object({
-  prompt: z.string().default('').describe("Message to echo "),
+  prompt: z.string().default('').describe("Message to echo"),
 });
 
 export const pingTool: UnifiedTool = {
@@ -14,9 +13,9 @@ export const pingTool: UnifiedTool = {
     description: "Echo test message with structured response.",
   },
   category: 'simple',
-  execute: async (args, onProgress) => {
+  execute: async (args) => {
     const message = args.prompt || args.message || "Pong!";
-    return executeCommand("echo", [message as string], onProgress);
+    return String(message);
   }
 };
 
@@ -30,7 +29,11 @@ export const helpTool: UnifiedTool = {
     description: "receive help information",
   },
   category: 'simple',
-  execute: async (args, onProgress) => {
-    return executeCommand("gemini", ["-help"], onProgress);
+  execute: async () => {
+    return `Gemini MCP Tools:
+- ask-gemini: Query Gemini for analysis, code review, or general questions. Supports @filepath for file inclusion and changeMode for structured edits.
+- brainstorm: Generate creative ideas using structured methodologies (SCAMPER, Design Thinking, Divergent, etc.).
+- ping: Echo test (health check).
+- help: This help text.`;
   }
 };

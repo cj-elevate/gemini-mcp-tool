@@ -1,10 +1,13 @@
-import { executeCommand } from './commandExecutor.js';
+import { GoogleGenAI } from '@google/genai';
+import { readFileSync, existsSync, realpathSync, statSync } from 'fs';
+import { resolve, extname } from 'path';
 import { Logger } from './logger.js';
-import { 
-  ERROR_MESSAGES, 
-  STATUS_MESSAGES, 
-  MODELS, 
-  CLI
+import {
+  ERROR_MESSAGES,
+  STATUS_MESSAGES,
+  MODELS,
+  SDK,
+  TIMEOUTS,
 } from '../constants.js';
 
 import { parseChangeModeOutput, validateChangeModeEdits } from './changeModeParser.js';
@@ -12,20 +15,101 @@ import { formatChangeModeResponse, summarizeChangeModeEdits } from './changeMode
 import { chunkChangeModeEdits } from './changeModeChunker.js';
 import { cacheChunks, getChunks } from './chunkCache.js';
 
-export async function executeGeminiCLI(
-  prompt: string,
-  model?: string,
-  sandbox?: boolean,
-  changeMode?: boolean,
-  onProgress?: (newOutput: string) => void,
-  cwd?: string
-): Promise<string> {
-  let prompt_processed = prompt;
-  
-  if (changeMode) {
-    prompt_processed = prompt.replace(/file:(\S+)/g, '@$1');
-    
-    const changeModeInstructions = `
+// ---------------------------------------------------------------------------
+// SDK Client (lazy singleton)
+// ---------------------------------------------------------------------------
+
+let _client: GoogleGenAI | null = null;
+
+function getClient(): GoogleGenAI {
+  if (!_client) {
+    const apiKey = process.env[SDK.API_KEY_ENV];
+    if (!apiKey) {
+      throw new Error(
+        `Missing ${SDK.API_KEY_ENV} environment variable. Set it in your MCP server config.`
+      );
+    }
+    _client = new GoogleGenAI({ apiKey });
+    Logger.debug('GoogleGenAI SDK client initialized');
+  }
+  return _client;
+}
+
+// ---------------------------------------------------------------------------
+// @filepath preprocessor
+// ---------------------------------------------------------------------------
+
+// Max file size for @filepath inlining (1 MB)
+const MAX_INLINE_FILE_SIZE = 1_048_576;
+
+/**
+ * Resolve @filepath references by reading files and inlining their content.
+ * The CLI handled this internally; the SDK is a text API so we do it here.
+ *
+ * Security: validates paths look like real files, prevents directory traversal,
+ * and caps file size to prevent memory exhaustion.
+ */
+function preprocessFileReferences(prompt: string): string {
+  return prompt.replace(/@(\S+)/g, (match, filePath: string) => {
+    // Skip non-file @ patterns
+    if (
+      filePath.startsWith('{') ||   // JSON-like
+      filePath.startsWith('(') ||   // grouped
+      filePath.includes('@') ||     // email-like (user@domain)
+      filePath.startsWith('/') && filePath.includes(':') || // URL-like
+      filePath.length < 3 ||        // too short to be a file
+      !looksLikeFilePath(filePath)  // must have extension or path separator
+    ) {
+      return match;
+    }
+
+    try {
+      const resolved = resolve(filePath);
+      // Prevent directory traversal: resolved path must not escape via ..
+      const real = realpathSync(resolved);
+      if (real !== resolved && real.includes('..')) {
+        Logger.debug(`Rejected traversal attempt: ${filePath}`);
+        return match;
+      }
+
+      if (!existsSync(real)) return match;
+
+      // Cap file size
+      const stats = statSync(real);
+      if (!stats.isFile() || stats.size > MAX_INLINE_FILE_SIZE) {
+        Logger.debug(`Skipping @ref: ${filePath} (${stats.isFile() ? `${stats.size} bytes` : 'not a file'})`);
+        return match;
+      }
+
+      const content = readFileSync(real, 'utf-8');
+      Logger.debug(`Inlined file reference: ${filePath} (${content.length} chars)`);
+      return `--- FILE: ${filePath} ---\n${content}\n---`;
+    } catch {
+      Logger.debug(`Could not read file reference: ${filePath}`);
+    }
+    return match;
+  });
+}
+
+/**
+ * Heuristic: does the string look like a file path?
+ * Must have a file extension OR contain a path separator.
+ */
+function looksLikeFilePath(s: string): boolean {
+  // Has a recognized extension
+  const ext = extname(s);
+  if (ext && ext.length > 1 && ext.length < 8) return true;
+  // Has path separators (forward or back slash)
+  if (s.includes('/') || s.includes('\\')) return true;
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// ChangeMode prompt builder
+// ---------------------------------------------------------------------------
+
+function buildChangeModePrompt(userPrompt: string): string {
+  return `
 [CHANGEMODE INSTRUCTIONS]
 You are generating code modifications that will be processed by an automated system. The output format is critical because it enables programmatic application of changes without human intervention.
 
@@ -83,60 +167,168 @@ NEW:
 IMPORTANT: The OLD section must be an EXACT copy from the file that can be found with Ctrl+F!
 
 USER REQUEST:
-${prompt_processed}
+${userPrompt}
 `;
-    prompt_processed = changeModeInstructions;
-  }
-  
-  const args = ['-y']; // YOLO mode for non-interactive
-  // DO NOT pass -m flag - let ~/.gemini/settings.json handle model selection
-  // The -m flag is buggy and causes fallback to flash models
-  // Only pass -m if explicitly requested (for future override capability)
-  if (model) {
-    args.push(CLI.FLAGS.MODEL, model);
-  }
-  if (sandbox) { args.push(CLI.FLAGS.SANDBOX); }
+}
 
-  // SECURITY FIX: Always use stdin for prompts to prevent flag injection
-  // When prompts are passed as positional args with shell:true, text like "-J" in "ProxyJump"
-  // gets interpreted as a CLI flag. Using stdin prevents this entirely.
-  // Reference: https://github.com/google-gemini/gemini-cli/issues/XXX
-  const stdinInput = prompt_processed;
-  Logger.debug('Using stdin for all prompts (flag injection prevention)', {
-    promptLength: prompt_processed.length,
-    lineCount: prompt_processed.split('\n').length
+// ---------------------------------------------------------------------------
+// Error classification
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if an error is a quota/rate limit error that should trigger fallback.
+ */
+function isQuotaError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const msg = error.message;
+    return (
+      msg.includes(ERROR_MESSAGES.RESOURCE_EXHAUSTED) ||
+      msg.includes(ERROR_MESSAGES.RATE_LIMITED) ||
+      msg.includes('429')
+    );
+  }
+  // Check if it has a status property (SDK APIError)
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    return (error as { status: number }).status === 429;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Core execution
+// ---------------------------------------------------------------------------
+
+/**
+ * Stream-generate content from Gemini SDK and collect response text.
+ * Reports progress via callback as chunks arrive.
+ * Includes a timeout (TIMEOUTS.GEMINI_REQUEST) to prevent hung requests.
+ */
+async function streamGenerate(
+  ai: GoogleGenAI,
+  model: string,
+  prompt: string,
+  onProgress?: (newOutput: string) => void,
+): Promise<string> {
+  const startTime = Date.now();
+  Logger.debug(`SDK request: model=${model}, prompt=${prompt.length} chars`);
+
+  // AbortController for total request duration (connection + streaming).
+  // httpOptions.timeout only covers the initial HTTP connection, not the
+  // full streaming read. This ensures hung streams are killed.
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), TIMEOUTS.GEMINI_REQUEST);
+
+  try {
+    const stream = await ai.models.generateContentStream({
+      model,
+      contents: prompt,
+      config: {
+        abortSignal: controller.signal,
+        httpOptions: { timeout: TIMEOUTS.GEMINI_REQUEST },
+      },
+    });
+
+    let fullText = '';
+    for await (const chunk of stream) {
+      const text = chunk.text;
+      if (text) {
+        fullText += text;
+        onProgress?.(text);
+      }
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    Logger.debug(`SDK response: ${fullText.length} chars in ${elapsed}s`);
+
+    if (!fullText) {
+      throw new Error('Gemini returned empty response');
+    }
+
+    return fullText;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      throw new Error(
+        `Gemini request timed out after ${elapsed}s (limit: ${TIMEOUTS.GEMINI_REQUEST / 1000}s)`
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
+/**
+ * Execute a prompt against the Gemini API via the @google/genai SDK.
+ * Replaces the old executeGeminiCLI which used child_process.spawn.
+ *
+ * Handles:
+ * - @filepath preprocessing (reads files inline)
+ * - changeMode prompt wrapping
+ * - Streaming with onProgress callbacks
+ * - Quota fallback (PRO -> FLASH)
+ */
+export async function executeGemini(
+  prompt: string,
+  options?: {
+    model?: string;
+    changeMode?: boolean;
+    onProgress?: (newOutput: string) => void;
+  }
+): Promise<string> {
+  const { model, changeMode, onProgress } = options ?? {};
+  const ai = getClient();
+
+  let processedPrompt = prompt;
+
+  // Convert file: references to @path (changeMode convention)
+  if (changeMode) {
+    processedPrompt = processedPrompt.replace(/file:(\S+)/g, '@$1');
+  }
+
+  // Resolve @filepath references by reading files inline
+  processedPrompt = preprocessFileReferences(processedPrompt);
+
+  // Wrap in changeMode instructions if needed
+  if (changeMode) {
+    processedPrompt = buildChangeModePrompt(processedPrompt);
+  }
+
+  const targetModel = model || MODELS.PRO;
+
+  Logger.debug('Executing Gemini SDK request', {
+    model: targetModel,
+    promptLength: processedPrompt.length,
+    changeMode: !!changeMode,
   });
 
   try {
-    return await executeCommand(CLI.COMMANDS.GEMINI, args, onProgress, cwd, stdinInput);
+    return await streamGenerate(ai, targetModel, processedPrompt, onProgress);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes(ERROR_MESSAGES.QUOTA_EXCEEDED) && model !== MODELS.FLASH) {
-      Logger.warn(`${ERROR_MESSAGES.QUOTA_EXCEEDED}. Falling back to ${MODELS.FLASH}.`);
-      await sendStatusMessage(STATUS_MESSAGES.FLASH_RETRY);
-      const fallbackArgs = ['-y']; // YOLO mode
-      fallbackArgs.push(CLI.FLAGS.MODEL, MODELS.FLASH);
-      if (sandbox) {
-        fallbackArgs.push(CLI.FLAGS.SANDBOX);
-      }
-
-      // stdinInput is always set now (flag injection prevention)
-      // No need to check hasNewlines - always use stdin
+    // Quota/rate limit fallback: retry with FLASH model
+    if (isQuotaError(error) && targetModel !== MODELS.FLASH) {
+      Logger.warn(`Quota exceeded for ${targetModel}. Falling back to ${MODELS.FLASH}.`);
+      onProgress?.(STATUS_MESSAGES.FLASH_RETRY);
 
       try {
-        const result = await executeCommand(CLI.COMMANDS.GEMINI, fallbackArgs, onProgress, cwd, stdinInput);
+        const result = await streamGenerate(ai, MODELS.FLASH, processedPrompt, onProgress);
         Logger.warn(`Successfully executed with ${MODELS.FLASH} fallback.`);
-        await sendStatusMessage(STATUS_MESSAGES.FLASH_SUCCESS);
+        onProgress?.(STATUS_MESSAGES.FLASH_SUCCESS);
         return result;
       } catch (fallbackError) {
-        const fallbackErrorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-        throw new Error(`${MODELS.PRO} quota exceeded, ${MODELS.FLASH} fallback also failed: ${fallbackErrorMessage}`);
+        const msg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        throw new Error(
+          `${targetModel} quota exceeded, ${MODELS.FLASH} fallback also failed: ${msg}`
+        );
       }
-    } else {
-      throw error;
     }
+    throw error;
   }
 }
+
+// ---------------------------------------------------------------------------
+// ChangeMode output processing (unchanged - transport-agnostic)
+// ---------------------------------------------------------------------------
 
 export async function processChangeModeOutput(
   rawResult: string,
@@ -154,21 +346,21 @@ export async function processChangeModeOutput(
         chunk.edits,
         { current: chunkIndex, total: cachedChunks.length, cacheKey: chunkCacheKey }
       );
-      
+
       // Add summary for first chunk only
       if (chunkIndex === 1 && chunk.edits.length > 5) {
         const allEdits = cachedChunks.flatMap(c => c.edits);
         result = summarizeChangeModeEdits(allEdits) + '\n\n' + result;
       }
-      
+
       return result;
     }
     Logger.debug(`Cache miss or invalid chunk index, processing new result`);
   }
-  
+
   // Parse OLD/NEW format
   const edits = parseChangeModeOutput(rawResult);
-  
+
   if (edits.length === 0) {
     return `No edits found in Gemini's response. Please ensure Gemini uses the OLD/NEW format. \n\n+ ${rawResult}`;
   }
@@ -178,36 +370,31 @@ export async function processChangeModeOutput(
   if (!validation.valid) {
     return `Edit validation failed:\n${validation.errors.join('\n')}`;
   }
-  
+
   const chunks = chunkChangeModeEdits(edits);
-  
+
   // Cache if multiple chunks and we have the original prompt
   let cacheKey: string | undefined;
   if (chunks.length > 1 && prompt) {
     cacheKey = cacheChunks(prompt, chunks);
     Logger.debug(`Cached ${chunks.length} chunks with key: ${cacheKey}`);
   }
-  
+
   // Return requested chunk or first chunk
   const returnChunkIndex = (chunkIndex && chunkIndex > 0 && chunkIndex <= chunks.length) ? chunkIndex : 1;
   const returnChunk = chunks[returnChunkIndex - 1];
-  
+
   // Format the response
   let result = formatChangeModeResponse(
     returnChunk.edits,
     chunks.length > 1 ? { current: returnChunkIndex, total: chunks.length, cacheKey } : undefined
   );
-  
+
   // Add summary if helpful (only for first chunk)
   if (returnChunkIndex === 1 && edits.length > 5) {
     result = summarizeChangeModeEdits(edits, chunks.length > 1) + '\n\n' + result;
   }
-  
+
   Logger.debug(`ChangeMode: Parsed ${edits.length} edits, ${chunks.length} chunks, returning chunk ${returnChunkIndex}`);
   return result;
-}
-
-// Placeholder
-async function sendStatusMessage(message: string): Promise<void> {
-  Logger.debug(`Status: ${message}`);
 }

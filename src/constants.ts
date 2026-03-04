@@ -5,18 +5,23 @@ export const LOG_PREFIX = "[GMCPT]";
 
 // Error messages
 export const ERROR_MESSAGES = {
-  QUOTA_EXCEEDED: "Quota exceeded for quota metric 'Gemini 2.5 Pro Requests'",
-  QUOTA_EXCEEDED_SHORT: "⚠️ Gemini 2.5 Pro daily quota exceeded. Please retry with model: 'gemini-2.5-flash'",
+  // SDK error codes (match against error.message or error.status)
+  RESOURCE_EXHAUSTED: "RESOURCE_EXHAUSTED",   // Quota exceeded (429)
+  RATE_LIMITED: "rateLimitExceeded",           // Rate limit hit
+  UNAUTHENTICATED: "UNAUTHENTICATED",         // Bad or missing API key
+  PERMISSION_DENIED: "PERMISSION_DENIED",      // Model access denied
+  UNAVAILABLE: "UNAVAILABLE",                  // Service temporarily down
+  // User-facing messages
+  QUOTA_EXCEEDED_SHORT: "Gemini Pro quota exceeded. Falling back to Flash model.",
   TOOL_NOT_FOUND: "not found in registry",
   NO_PROMPT_PROVIDED: "Please provide a prompt for analysis. Use @ syntax to include files (e.g., '@largefile.js explain what this does') or ask general questions",
 } as const;
 
 // Status messages
 export const STATUS_MESSAGES = {
-  QUOTA_SWITCHING: "🚫 Gemini 2.5 Pro quota exceeded, switching to Flash model...",
-  FLASH_RETRY: "⚡ Retrying with Gemini 2.5 Flash...",
+  QUOTA_SWITCHING: "Gemini Pro quota exceeded, switching to Flash model...",
+  FLASH_RETRY: "Retrying with Gemini Flash...",
   FLASH_SUCCESS: "✅ Flash model completed successfully",
-  SANDBOX_EXECUTING: "🔒 Executing Gemini CLI command in sandbox mode...",
   GEMINI_RESPONSE: "Gemini response:",
   // Timeout prevention messages
   PROCESSING_START: "🔍 Starting analysis (may take 5-15 minutes for large codebases)",
@@ -24,11 +29,15 @@ export const STATUS_MESSAGES = {
   PROCESSING_COMPLETE: "✅ Analysis completed successfully",
 } as const;
 
-// Models
+// Models (SDK-compatible names)
 export const MODELS = {
-  PRO: "gemini-2.5-pro",
-  PRO_25: "gemini-2.5-pro",
+  PRO: "gemini-3-pro-preview",
   FLASH: "gemini-2.5-flash",
+} as const;
+
+// SDK Configuration
+export const SDK = {
+  API_KEY_ENV: "GEMINI_API_KEY",
 } as const;
 
 // MCP Protocol Constants
@@ -60,30 +69,7 @@ export const PROTOCOL = {
 
 // Timeout Constants
 export const TIMEOUTS = {
-  GEMINI_CLI: 300000, // 5 minutes for Gemini CLI responses
-  SIMPLE_COMMAND: 30000, // 30 seconds for simple commands (echo, help)
-} as const;
-
-// CLI Constants
-export const CLI = {
-  // Command names
-  COMMANDS: {
-    GEMINI: "gemini",
-    ECHO: "echo",
-  },
-  // Command flags
-  FLAGS: {
-    MODEL: "-m",
-    SANDBOX: "-s",
-    PROMPT: "-p",
-    HELP: "-help",
-  },
-  // Default values
-  DEFAULTS: {
-    MODEL: "gemini-3-pro-preview", // Gemini 3 Pro (CLI v0.29.5 doesn't support 3.1 yet - revisit when CLI updates)
-    BOOLEAN_TRUE: "true",
-    BOOLEAN_FALSE: "false",
-  },
+  GEMINI_REQUEST: 300000, // 5 minutes for Gemini SDK responses
 } as const;
 
 
@@ -91,7 +77,6 @@ export const CLI = {
 export interface ToolArguments {
   prompt?: string;
   model?: string;
-  sandbox?: boolean | string;
   changeMode?: boolean | string;
   chunkIndex?: number | string; // Which chunk to return (1-based)
   chunkCacheKey?: string; // Optional cache key for continuation

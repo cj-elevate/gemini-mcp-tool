@@ -1,7 +1,7 @@
 ---
 type: doc
 doc: changelog
-updated: 2026-01-25
+updated: 2026-02-23
 project: gemini-mcp
 area: servers
 ---
@@ -12,6 +12,34 @@ Gemini CLI wrapper for code review and brainstorming
 All notable changes to this server will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [2026-02-23] - SDK Migration
+
+### Changed
+- **BREAKING:** Replaced CLI `child_process.spawn` with `@google/genai` Node SDK (v1.42+)
+- `executeGeminiCLI` renamed to `executeGemini` with options object pattern
+- Model default is now `gemini-3-pro-preview` (configured in constants.ts, not settings.json)
+- Streaming via `ai.models.generateContentStream()` instead of stdout parsing
+- `@filepath` references now preprocessed inline (SDK is text-only, no CLI @ handling)
+- Node engine requirement bumped from >=16 to >=18
+
+### Added
+- `@google/genai` SDK dependency for direct Gemini API access
+- Dual timeout: `httpOptions.timeout` (connection) + `AbortController` (total duration)
+- `@filepath` security: path validation, traversal prevention, 1MB size cap
+- SDK error codes in constants: RESOURCE_EXHAUSTED, RATE_LIMITED, UNAUTHENTICATED, PERMISSION_DENIED, UNAVAILABLE
+- Static help text in help tool (no longer spawns CLI)
+
+### Removed
+- `commandExecutor.ts` (CLI process spawner) - deleted entirely
+- `sandbox` parameter from ask-gemini tool (was CLI `-s` flag, no SDK equivalent)
+- `workingDirectory` parameter from ask-gemini tool (was CLI cwd)
+- `model` parameter from brainstorm tool (always uses PRO with auto-fallback)
+- Unused dependencies: `inquirer`, `chalk`, `prismjs`, `d3-shape`, `ai`, `@types/inquirer`
+- CLI constants (COMMANDS, FLAGS, DEFAULTS)
+
+### Security
+- `@filepath` preprocessor validates paths look like real files, uses `realpathSync` for traversal prevention, caps at 1MB
 
 ## [2026-01-25]
 
