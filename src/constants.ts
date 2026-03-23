@@ -69,7 +69,7 @@ export const PROTOCOL = {
 
 // Timeout Constants
 export const TIMEOUTS = {
-  GEMINI_REQUEST: 300000, // 5 minutes for Gemini SDK responses
+  GEMINI_REQUEST: 110000, // 110s — must be < proxy's 120s BACKEND_TIMEOUT to fail gracefully before proxy kills it
 } as const;
 
 
