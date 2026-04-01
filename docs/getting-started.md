@@ -1,6 +1,6 @@
 ---
 type: note
-updated: 2026-01-03
+updated: 2026-03-10
 area: servers
 project: gemini-mcp
 ---
@@ -15,14 +15,14 @@ project: gemini-mcp
     <p>One-command setup</p>
     <a href="#claude-code-recommended" class="client-button">Get Started →</a>
   </div>
-  
+
   <div class="client-card">
     <h3>🖥️ <br>Claude Desktop</h3>
     <div class="client-badge">Everyday users</div>
     <p>JSON configuration</p>
     <a href="#claude-desktop" class="client-button">Setup Guide →</a>
   </div>
-  
+
   <div class="client-card">
     <h3>📂 Other Clients</h3>
     <div class="client-badge">40+ Options</div>
@@ -37,9 +37,11 @@ project: gemini-mcp
 
 Before installing, ensure you have:
 
-- **[Node.js](https://nodejs.org/)** v16.0.0 or higher
-- **[Google Gemini CLI](https://github.com/google-gemini/gemini-cli)** installed and configured on your system
+- **[Node.js](https://nodejs.org/)** v18.0.0 or higher
+- **[Google AI API Key](https://aistudio.google.com/app/apikey)** — Free tier available
 - **[Claude Desktop](https://claude.ai/download)** or **[Claude Code](https://www.anthropic.com/claude-code)** with MCP support
+
+> **No CLI required** — This implementation uses the `@google/genai` SDK directly. The `gemini-cli` tool is not needed.
 
 
 ## Claude Code (Recommended)
@@ -49,7 +51,7 @@ Claude Code offers the smoothest experience.
 
 ```bash
 # install for claude code
-claude mcp add gemini-cli -- npx -y gemini-mcp-tool
+claude mcp add gemini-mcp -- npx -y gemini-mcp-tool
 
 # Start Claude Code - it's automatically configured!
 claude
@@ -65,7 +67,7 @@ claude
 
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 </ConfigModal>
 
@@ -76,9 +78,12 @@ For Claude Desktop users, add this to your configuration file:
 ```json
 {
   "mcpServers": {
-    "gemini-cli": {
+    "gemini-mcp": {
       "command": "npx",
-      "args": ["-y", "gemini-mcp-tool"]
+      "args": ["-y", "gemini-mcp-tool"],
+      "env": {
+        "GEMINI_API_KEY": "your-api-key-here"
+      }
     }
   }
 }
@@ -97,7 +102,10 @@ Gemini MCP Tool works with 40+ MCP clients! Here are the common configuration pa
   "transport": {
     "type": "stdio",
     "command": "npx",
-    "args": ["-y", "gemini-mcp-tool"]
+    "args": ["-y", "gemini-mcp-tool"],
+    "env": {
+      "GEMINI_API_KEY": "your-api-key-here"
+    }
   }
 }
 ```
@@ -111,13 +119,15 @@ Gemini MCP Tool works with 40+ MCP clients! Here are the common configuration pa
 
 ```json
 {
-  "gemini-cli": {
+  "gemini-mcp": {
     "command": "npx",
     "args": [
       "-y",
       "gemini-mcp-tool"
     ],
-    "env": {},
+    "env": {
+      "GEMINI_API_KEY": "your-api-key-here"
+    },
     "working_directory": null,
     "start_on_launch": true
   }
@@ -128,10 +138,10 @@ Gemini MCP Tool works with 40+ MCP clients! Here are the common configuration pa
 </details>
 ### Generic Setup Steps
 
-1. **Install Prerequisites**: Ensure [Gemini CLI](https://github.com/google-gemini/gemini-cli) is installed
+1. **Get API Key**: Obtain your key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 2. **Add Server Config**: Use the STDIO transport pattern above
 3. **Restart Client**: Most clients require restart after config changes
-4. **Test Connection**: Try `/gemini-cli:ping` or natural language commands
+4. **Test Connection**: Use natural language to invoke tools
 
 ## Verify Your Setup
 
@@ -140,34 +150,22 @@ Once configured, test that everything is working:
 ### 1. Basic Connectivity Test
 Type in Claude:
 ```
-/gemini-cli:ping "Hello from Gemini MCP!"
+use gemini ping
 ```
 
 ### 2. Test File Analysis
 ```
-/gemini-cli:analyze @README.md summarize this file
-```
-
-### 3. Test Sandbox Mode
-```
-/gemini-cli:sandbox create a simple Python hello world script
+analyze @README.md and summarize this file
 ```
 
 ## Quick Command Reference
 
-Once installed, you can use natural language or slash commands:
+Once installed, use natural language to invoke tools:
 
 ### Natural Language Examples
 - "use gemini to explain index.html"
 - "understand the massive project using gemini"
-- "ask gemini to search for latest news"
-
-### Slash Commands in Claude Code
-Type `/gemini-cli` and these commands will appear:
-- `/gemini-cli:analyze` - Analyze files or ask questions
-- `/gemini-cli:sandbox` - Safe code execution
-- `/gemini-cli:help` - Show help information
-- `/gemini-cli:ping` - Test connectivity
+- "ask gemini to compare REST vs GraphQL"
 
 ## Need a Different Client?
 
@@ -181,18 +179,17 @@ Don't see your MCP client listed? Gemini MCP Tool uses standard MCP protocol and
 
 ## Common Issues
 
-### "Command not found: gemini"
-Make sure you've installed the Gemini CLI:
-```bash
-npm install -g @google/gemini-cli
-```
+### "Missing GEMINI_API_KEY"
+Make sure you've added the `env` block with your API key to the MCP server configuration.
+
+Get your key at: https://aistudio.google.com/app/apikey
 
 ### "MCP server not responding"
 0. run claude code --> /doctor
 1. Check your configuration file path
 2. Ensure JSON syntax is correct
 3. Restart your MCP client completely
-4. Verify Gemini CLI works: `gemini -help`
+4. Verify your API key is valid
 
 
 ### Client-Specific Issues
@@ -203,10 +200,10 @@ npm install -g @google/gemini-cli
 
 Now that you're set up:
 - Learn about file analysis with @ syntax
-- Explore sandbox mode for safe code execution
+- Explore changeMode for structured code edits
 - Check out real-world examples in the README
 - Join the community for support
 
 ::: info Need Help?
-If you run into issues, [open an issue](https://github.com/jamubc/gemini-mcp-tool/issues) on GitHub.
+If you run into issues, [open an issue](https://github.com/cj-elevate/gemini-mcp-tool/issues) on GitHub.
 :::

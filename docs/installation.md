@@ -1,6 +1,6 @@
 ---
 type: note
-updated: 2026-01-03
+updated: 2026-03-10
 area: servers
 project: gemini-mcp
 ---
@@ -10,9 +10,11 @@ Multiple ways to install Gemini MCP Tool, depending on your needs.
 
 ## Prerequisites
 
-- Node.js v16.0.0 or higher
+- **[Node.js](https://nodejs.org/)** v18.0.0 or higher
+- **[Google AI API Key](https://aistudio.google.com/app/apikey)** — Free tier available
 - Claude Desktop or Claude Code with MCP support
-- Gemini CLI installed (`npm install -g @google/gemini-cli`)
+
+> **No CLI required** — This implementation uses the `@google/genai` SDK directly.
 
 ## Method 1: NPX (Recommended)
 
@@ -21,9 +23,12 @@ No installation needed - runs directly:
 ```json
 {
   "mcpServers": {
-    "gemini-cli": {
+    "gemini-mcp": {
       "command": "npx",
-      "args": ["-y", "gemini-mcp-tool"]
+      "args": ["-y", "gemini-mcp-tool"],
+      "env": {
+        "GEMINI_API_KEY": "your-api-key-here"
+      }
     }
   }
 }
@@ -32,15 +37,18 @@ No installation needed - runs directly:
 ## Method 2: Global Installation
 
 ```bash
-claude mcp add gemini-cli -- npx -y gemini-mcp-tool
+npm install -g gemini-mcp-tool
 ```
 
 Then configure:
 ```json
 {
   "mcpServers": {
-    "gemini-cli": {
-      "command": "gemini-mcp"
+    "gemini-mcp": {
+      "command": "gemini-mcp-tool",
+      "env": {
+        "GEMINI_API_KEY": "your-api-key-here"
+      }
     }
   }
 }

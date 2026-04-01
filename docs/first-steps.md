@@ -1,6 +1,6 @@
 ---
 type: note
-updated: 2026-01-03
+updated: 2026-03-11
 area: servers
 project: gemini-mcp
 ---
@@ -11,14 +11,14 @@ Once installed, here's how to get started with Gemini MCP Tool.
 ## Test Connection
 
 ```
-/gemini-cli:ping "Hello from Gemini!"
+use gemini ping
 ```
 
 ## Basic File Analysis
 
 Analyze a single file:
 ```
-/gemini-cli:analyze @README.md summarize this
+use gemini to summarize @README.md
 ```
 
 ## Natural Language Usage
@@ -28,11 +28,11 @@ Just ask naturally:
 - "Ask gemini to analyze the architecture"
 - "Have gemini review this function"
 
-## Sandbox Testing
+## ChangeMode for Code Edits
 
-Test code safely:
+Get structured code edit suggestions:
 ```
-/gemini-cli:sandbox create a Python script that generates fibonacci numbers
+use gemini changemode to refactor @src/utils.ts
 ```
 
 ## Next Steps

@@ -1,112 +1,57 @@
 ---
 type: note
-updated: 2026-01-03
+updated: 2026-03-10
 area: servers
 project: gemini-mcp
 ---
 # Sandbox Mode
 
-Execute code safely in an isolated environment.
+> **Note:** Sandbox mode was removed in v1.1.4 (2026-02-23 SDK migration). The `@google/genai` SDK does not provide an equivalent safe code execution feature.
 
-## What is Sandbox Mode?
+## What Was Sandbox Mode?
 
-Sandbox mode allows Gemini to write and test code in a secure, isolated environment without affecting your system.
+Sandbox mode previously allowed Gemini to write and test code in a secure, isolated environment. This feature relied on the Gemini CLI's `-s` flag for safe code execution.
 
-## Basic Usage
+## Why Was It Removed?
 
-```
-/gemini-cli:sandbox create a Python script that sorts a list
-```
+During the migration from CLI subprocess to `@google/genai` SDK:
+- The SDK is a text-only API and does not expose code execution capabilities
+- No SDK equivalent exists for the CLI's sandbox mode
+- Removing this inconsistency allows the SDK integration to work reliably
 
-## How It Works
+## Alternatives for Code Testing
 
-1. **Request** → You ask for code to be created/tested
-2. **Generation** → Gemini writes the code
-3. **Execution** → Code runs in isolated environment
-4. **Results** → Output returned safely
-
-## Use Cases
-
-### Algorithm Testing
-```
-/gemini-cli:sandbox implement and test quicksort in JavaScript
+### Local Execution
+Run code examples locally in your development environment:
+```bash
+python example.py
+node script.js
 ```
 
-### Data Processing
+### IDE Integration
+Use your IDE's built-in code runner or debugger.
+
+### Online Environments
+- [Google Colab](https://colab.research.google.com/) for Python
+- [CodeSandbox](https://codesandbox.io/) for JavaScript
+- [Replit](https://replit.com/) for multiple languages
+
+## For Code Analysis (Without Execution)
+
+The `ask-gemini` tool can still analyze and explain code without running it:
+
 ```
-/gemini-cli:sandbox parse this CSV and show statistics: [data]
-```
-
-### Proof of Concepts
-```
-/gemini-cli:sandbox create a working web scraper example
-```
-
-## Safety Features
-
-- **Isolated Execution**: No access to your file system
-- **Resource Limits**: CPU and memory constraints
-- **Time Limits**: Prevents infinite loops
-- **No Network**: Cannot make external requests
-
-## Supported Languages
-
-- Python
-- JavaScript/Node.js
-- Ruby
-- Go
-- Java
-- C++
-- More coming soon!
-
-## Best Practices
-
-### 1. Be Specific
-```
-// Good
-create a function that validates email addresses with tests
-
-// Vague
-make something that checks emails
+use gemini to explain what this code does: @script.js
+ask gemini to find potential bugs in @api/routes.ts
+use gemini to review @utils/helpers.ts for best practices
 ```
 
-### 2. Include Test Cases
-```
-implement binary search with edge case handling and show test results
-```
+## Migration Notes
 
-### 3. Iterative Development
-```
-// First iteration
-create a basic REST API
+If you were using sandbox mode:
 
-// Refine
-add authentication to the API
+1. **Code Review**: Use `ask-gemini` to analyze code without execution
+2. **Testing**: Run tests in your local environment or CI/CD pipeline
+3. **Prototyping**: Use online code playgrounds for quick experiments
 
-// Test
-show example requests and responses
-```
-
-## Limitations
-
-- No file system access
-- No network requests
-- Limited execution time (30s)
-- Memory limit (512MB)
-
-## Examples
-
-### Testing Algorithms
-```
-/gemini-cli:sandbox benchmark bubble sort vs quick sort with 1000 items
-```
-
-### Learning Code
-```
-/gemini-cli:sandbox show me how promises work in JavaScript with examples
-```
-
-### Debugging
-```
-/gemini-cli:sandbox why does this code fail: [paste code]
-```
+For more information about the SDK migration, see the [CHANGELOG](/CHANGELOG.md).

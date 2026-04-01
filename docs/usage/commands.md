@@ -1,67 +1,71 @@
 ---
 type: note
-updated: 2026-01-03
+updated: 2026-03-10
 area: servers
 project: gemini-mcp
 ---
-# Commands Reference
+# Tool Reference
 
-Complete list of available commands and their usage.
+Complete list of available tools and their usage.
 
-## Slash Commands
+## Available Tools
 
-### `/gemini-cli:analyze`
-Analyze files or ask questions about code.
+### `ask-gemini`
+Query Gemini for analysis, code review, or general questions.
 
+**Parameters:**
+- `prompt` (required): Your question or analysis request
+- `changeMode` (optional): Enable structured code edits (OLD/NEW format)
+- `chunkIndex` (optional): Retrieve specific chunk from large changeMode response
+- `chunkCacheKey` (optional): Cache key for retrieving subsequent chunks
+
+**Examples:**
 ```
-/gemini-cli:analyze @file.js explain this code
-/gemini-cli:analyze @src/*.ts find security issues
-/gemini-cli:analyze how do I implement authentication?
-```
-
-### `/gemini-cli:sandbox`
-Execute code in a safe environment.
-
-```
-/gemini-cli:sandbox create a Python fibonacci generator
-/gemini-cli:sandbox test this function: [code]
-```
-
-### `/gemini-cli:help`
-Show help information and available tools.
-
-```
-/gemini-cli:help
-/gemini-cli:help analyze
+use gemini to explain @index.js
+ask gemini to analyze @package.json and list dependencies
+use gemini changemode to refactor @src/utils.ts
 ```
 
-### `/gemini-cli:ping`
-Test connectivity with Gemini.
+### `fetch-chunk`
+Retrieve cached chunks from a previous changeMode response.
 
+**Parameters:**
+- `cacheKey` (required): Cache key from original changeMode response
+- `chunkIndex` (required): Which chunk to retrieve (1-based)
+
+**When to use:** After receiving a changeMode response with multiple chunks, use this to get subsequent chunks.
+
+### `brainstorm`
+Generate creative ideas using structured methodologies.
+
+**Parameters:**
+- `prompt` (required): Topic or challenge to explore
+
+**Examples:**
 ```
-/gemini-cli:ping
-/gemini-cli:ping "Custom message"
+brainstorm alternative approaches to user authentication
+use brainstorm to explore API design patterns
 ```
 
-## Command Structure
+### `ping`
+Test connectivity with the MCP server.
 
-```
-/gemini-cli:<tool> [options] <arguments>
-```
+**Parameters:**
+- `prompt` (optional): Message to echo back
 
-- **tool**: The action to perform (analyze, sandbox, help, ping)
-- **options**: Optional flags (coming soon)
-- **arguments**: Input text, files, or questions
+### `Help`
+Show help information about available tools.
 
-## Natural Language Alternative
+## Natural Language Invocation
 
-Instead of slash commands, you can use natural language:
+Instead of special syntax, use natural language:
 
 - "Use gemini to analyze index.js"
-- "Ask gemini to create a test file"
+- "Ask gemini to compare REST vs GraphQL"
 - "Have gemini explain this error"
+- "Use gemini changemode to add error handling"
 
-## File Patterns
+## File References with @ Syntax
 
 ### Single File
 ```
@@ -75,39 +79,54 @@ Instead of slash commands, you can use natural language:
 @file1.js @file2.js @file3.js
 ```
 
-### Wildcards
+### Absolute Paths (Windows Multi-Drive)
 ```
-@*.json           # All JSON files in current directory
-@src/*.js         # All JS files in src
-@**/*.test.js     # All test files recursively
+@D:/projects/other/code.ts
+@C:/Users/Me/config.json
 ```
 
-### Directory
-```
-@src/             # All files in src
-@test/unit/       # All files in test/unit
-```
+**Important:** @filepath works with single files only. Directory references (e.g., `@src/`) are not expanded.
+
+## ChangeMode Workflow
+
+For structured code edits, enable changeMode:
+
+1. **Request with changeMode:**
+   ```
+   use gemini changemode to refactor @src/utils.ts to use async/await
+   ```
+
+2. **Receive chunked response** (if many edits):
+   ```
+   **Chunk 1 of 3** - Use cacheKey: abc123 for remaining chunks
+   ```
+
+3. **Fetch subsequent chunks:**
+   ```
+   use fetch-chunk with cacheKey: abc123 chunkIndex: 2
+   ```
 
 ## Advanced Usage
 
-### Combining Files and Questions
+### Combining Files and Analysis
 ```
-/gemini-cli:analyze @package.json @src/index.js is the entry point configured correctly?
-```
-
-### Complex Queries
-```
-/gemini-cli:analyze @src/**/*.js @test/**/*.test.js what's the test coverage?
+use gemini to analyze @package.json @src/index.js and check if the entry point is configured correctly
 ```
 
-### Code Generation
+### Code Review with ChangeMode
 ```
-/gemini-cli:analyze @models/user.js generate TypeScript types for this model
+use gemini changemode to review @src/api/routes.ts and add proper error handling
+```
+
+### Comparing Files
+```
+ask gemini to compare @app.tsx vs @app.old.tsx and summarize the differences
 ```
 
 ## Tips
 
-1. **Start Simple**: Begin with single files before using patterns
-2. **Be Specific**: Clear questions get better answers
-3. **Use Context**: Include relevant files for better analysis
-4. **Iterate**: Refine your queries based on responses
+1. **Be Specific**: Clear questions get better answers
+2. **Use @filepath**: Reference actual files for better context
+3. **Enable ChangeMode**: For code edits to get structured OLD/NEW format
+4. **Single Files Only**: @filepath doesn't expand directories
+5. **Absolute Paths**: Use full paths for files outside working directory

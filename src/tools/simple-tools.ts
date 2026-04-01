@@ -31,9 +31,10 @@ export const helpTool: UnifiedTool = {
   category: 'simple',
   execute: async () => {
     return `Gemini MCP Tools:
-- ask-gemini: Query Gemini for analysis, code review, or general questions. Supports @filepath for file inclusion and changeMode for structured edits.
+- ask-gemini: Query Gemini for analysis, code review, or general questions. Supports @filepath for single-file inclusion and changeMode for structured edits.
+- fetch-chunk: Retrieve cached chunks from a previous changeMode response. Use cacheKey and chunkIndex parameters.
 - brainstorm: Generate creative ideas using structured methodologies (SCAMPER, Design Thinking, Divergent, etc.).
 - ping: Echo test (health check).
-- help: This help text.`;
+- Help: This help text.`;
   }
 };

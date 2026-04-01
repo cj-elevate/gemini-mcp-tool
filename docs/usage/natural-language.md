@@ -1,6 +1,6 @@
 ---
 type: note
-updated: 2026-01-03
+updated: 2026-03-11
 area: servers
 project: gemini-mcp
 ---
@@ -10,29 +10,23 @@ You don't need to memorize commands - just ask naturally!
 
 ## How It Works
 
-Claude Code understands when you want to use Gemini and automatically routes your request.
+Claude Code understands when you want to use Gemini and automatically routes your request to the appropriate MCP tool.
 
 ## Examples
 
 ### File Analysis
-Instead of: `/gemini-cli:analyze @app.js explain`
-
 Say:
 - "Use gemini to explain app.js"
 - "Ask gemini what this code does"
 - "Have gemini analyze the main application file"
 
-### Code Generation
-Instead of: `/gemini-cli:sandbox create a web server`
-
+### Code Review
 Say:
-- "Get gemini to create a simple web server"
-- "I need gemini to write a REST API example"
-- "Can gemini show me how to build an Express server?"
+- "Get gemini to review my changes"
+- "Ask gemini to check this for security issues"
+- "Have gemini compare these two files"
 
 ### Debugging
-Instead of: `/gemini-cli:analyze @error.log @app.js debug`
-
 Say:
 - "Help me debug this error using gemini"
 - "Gemini, why is my app crashing?"
@@ -52,23 +46,17 @@ Claude recognizes these patterns:
 
 ### 1. Be Conversational
 ```
-❌ /gemini-cli:analyze @config.json validate
-
-✅ "Hey, can gemini check if my config.json is valid?"
+"Hey, can gemini check if my config.json is valid?"
 ```
 
 ### 2. Provide Context
 ```
-❌ "analyze the bug"
-
-✅ "Gemini, I'm getting a null pointer error in my auth handler, can you help?"
+"Gemini, I'm getting a null pointer error in my auth handler, can you help?"
 ```
 
 ### 3. Specify Files Naturally
 ```
-❌ @src/utils.js @src/helpers.js relationship
-
-✅ "How do utils.js and helpers.js work together? Ask gemini."
+"How do utils.js and helpers.js work together? Ask gemini."
 ```
 
 ## Common Patterns
@@ -88,16 +76,6 @@ Claude recognizes these patterns:
 - "Use gemini to refactor this function"
 - "Help me optimize this algorithm with gemini"
 
-## Mixing Commands and Natural Language
-
-You can combine both approaches:
-
-```
-"I need to debug this" → /gemini-cli:analyze @app.js @error.log
-```
-
-Claude understands the context and uses the appropriate tool.
-
 ## Tips
 
 1. **Just Ask**: Don't overthink the syntax
@@ -106,4 +84,3 @@ Claude understands the context and uses the appropriate tool.
 4. **No Memorization**: Use whatever feels natural
 
 Remember: The goal is to make AI assistance feel natural, not robotic!
-
