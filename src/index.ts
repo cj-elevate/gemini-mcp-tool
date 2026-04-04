@@ -1,5 +1,35 @@
 #!/usr/bin/env node
 
+// ---------------------------------------------------------------------------
+// Fatal crash handlers — MUST be first, before any async work.
+// Logs to stderr (captured by parent proxy) so crashes aren't silent.
+// ---------------------------------------------------------------------------
+function fatalLog(kind: string, err: unknown) {
+  const e = err instanceof Error ? err : new Error(String(err));
+  const payload = {
+    kind,
+    pid: process.pid,
+    uptimeSec: Math.round(process.uptime()),
+    message: e.message,
+    stack: e.stack,
+  };
+  try {
+    process.stderr.write(`[GMCPT] [FATAL] ${JSON.stringify(payload)}\n`);
+  } catch { /* stderr may be closed */ }
+}
+
+process.on('unhandledRejection', (reason) => {
+  fatalLog('unhandledRejection', reason);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error) => {
+  fatalLog('uncaughtException', error);
+  process.exit(1);
+});
+
+// ---------------------------------------------------------------------------
+
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -254,4 +284,7 @@ async function main() {
   Logger.debug("init gemini-mcp-tool");
   const transport = new StdioServerTransport(); await server.connect(transport);
   Logger.debug("gemini-mcp-tool listening on stdio");
-} main().catch((error) => {Logger.error("Fatal error:", error); process.exit(1); }); 
+} main().catch((error) => {
+  fatalLog('startup', error);
+  process.exit(1);
+});
