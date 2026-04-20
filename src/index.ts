@@ -142,26 +142,41 @@ function startProgressUpdates(
   }
   
   // Keep client alive with periodic updates
+  // UNCONDITIONAL keepalive: emit a debug-level MCP logging notification on every
+  // interval tick while processing. This prevents the proxy's stall watchdog from
+  // killing the process during extended thinking phases where the Gemini API produces
+  // no stdout for 90-180s+. Standard MCP `notifications/message` is protocol-compliant
+  // and requires no proxy changes — the proxy's handleStdoutData resets the activity
+  // timer on ANY stdout line.
+  const startTime = Date.now();
   const progressInterval = setInterval(async () => {
-    if (isProcessing && progressToken) {
-      // Simply increment progress value
-      progress += 1;
-      
-      // Include latest output if available
-      const baseMessage = progressMessages[messageIndex % progressMessages.length];
-      const outputPreview = latestOutput.slice(-150).trim(); // Last 150 chars
-      const message = outputPreview 
-        ? `${baseMessage}\n📝 Output: ...${outputPreview}`
-        : baseMessage;
-      
-      await sendProgressNotification(
-        progressToken,
-        progress,
-        undefined, // No total - indeterminate progress
-        message
-      );
-      messageIndex++;
-    } else if (!isProcessing) {
+    if (isProcessing) {
+      // Unconditional keepalive: always emit a debug log notification
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      await sendNotification("notifications/message", {
+        level: "debug",
+        logger: "gemini-mcp",
+        data: `keepalive (${elapsed}s elapsed)`,
+      });
+
+      // Additionally send formal progress if client requested it
+      if (progressToken) {
+        progress += 1;
+        const baseMessage = progressMessages[messageIndex % progressMessages.length];
+        const outputPreview = latestOutput.slice(-150).trim();
+        const message = outputPreview
+          ? `${baseMessage}\n📝 Output: ...${outputPreview}`
+          : baseMessage;
+
+        await sendProgressNotification(
+          progressToken,
+          progress,
+          undefined,
+          message
+        );
+        messageIndex++;
+      }
+    } else {
       clearInterval(progressInterval);
     }
   }, PROTOCOL.KEEPALIVE_INTERVAL); // Every 25 seconds

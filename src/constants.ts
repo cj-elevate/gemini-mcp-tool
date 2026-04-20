@@ -11,28 +11,33 @@ export const ERROR_MESSAGES = {
   UNAUTHENTICATED: "UNAUTHENTICATED",         // Bad or missing API key
   PERMISSION_DENIED: "PERMISSION_DENIED",      // Model access denied
   UNAVAILABLE: "UNAVAILABLE",                  // Service temporarily down
-  // User-facing messages
-  QUOTA_EXCEEDED_SHORT: "Gemini Pro quota exceeded. Falling back to Flash model.",
+  // User-facing messages (fail-closed — no silent fallback)
   TOOL_NOT_FOUND: "not found in registry",
   NO_PROMPT_PROVIDED: "Please provide a prompt for analysis. Use @ syntax to include files (e.g., '@largefile.js explain what this does') or ask general questions",
 } as const;
 
-// Status messages
-export const STATUS_MESSAGES = {
-  QUOTA_SWITCHING: "Gemini Pro quota exceeded, switching to Flash model...",
-  FLASH_RETRY: "Retrying with Gemini Flash...",
-  FLASH_SUCCESS: "✅ Flash model completed successfully",
-  GEMINI_RESPONSE: "Gemini response:",
-  // Timeout prevention messages
-  PROCESSING_START: "🔍 Starting analysis (may take 5-15 minutes for large codebases)",
-  PROCESSING_CONTINUE: "⏳ Still processing... Gemini is working on your request",
-  PROCESSING_COMPLETE: "✅ Analysis completed successfully",
+// Stable error codes for machine detection (proxy, hooks, /team synthesis)
+export const ERROR_CODES = {
+  QUOTA_EXHAUSTED: "GEMINI_QUOTA_EXHAUSTED",
+  RATE_LIMITED: "GEMINI_RATE_LIMITED",
+  OVERLOADED: "GEMINI_OVERLOADED",
+  AUTH_FAILED: "GEMINI_AUTH_FAILED",
+  TIMEOUT: "GEMINI_TIMEOUT",
+  UNKNOWN: "GEMINI_ERROR",
 } as const;
 
-// Models (SDK-compatible names)
+// Status messages
+export const STATUS_MESSAGES = {
+  GEMINI_RESPONSE: "Gemini response:",
+  // Timeout prevention messages
+  PROCESSING_START: "Starting analysis (may take 1-5 minutes with deep reasoning)",
+  PROCESSING_CONTINUE: "Still processing... Gemini is working on your request",
+  PROCESSING_COMPLETE: "Analysis completed successfully",
+} as const;
+
+// Models — Gemini 3+ only. No automatic fallback. Fail-closed.
 export const MODELS = {
-  PRO: "gemini-3-pro-preview",
-  FLASH: "gemini-2.5-flash",
+  PRO: "gemini-3.1-pro-preview",
 } as const;
 
 // SDK Configuration
@@ -67,9 +72,9 @@ export const PROTOCOL = {
 } as const;
 
 
-// Timeout Constants
+// Timeout Constants — Gemini 3 with thinking enabled needs longer timeouts
 export const TIMEOUTS = {
-  GEMINI_REQUEST: 110000, // 110s — must be < proxy's 120s BACKEND_TIMEOUT to fail gracefully before proxy kills it
+  GEMINI_REQUEST: 300000, // 300s — Gemini 3 with HIGH thinking can take 60-120s, 300s covers tail latency
 } as const;
 
 
@@ -78,6 +83,7 @@ export interface ToolArguments {
   prompt?: string;
   model?: string;
   changeMode?: boolean | string;
+  thinkingLevel?: string; // MINIMAL | LOW | MEDIUM | HIGH
   chunkIndex?: number | string; // Which chunk to return (1-based)
   chunkCacheKey?: string; // Optional cache key for continuation
   message?: string; // For Ping tool -- Un-used.

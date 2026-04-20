@@ -9,20 +9,21 @@ import {
 const askGeminiArgsSchema = z.object({
   prompt: z.string().min(1).describe("Analysis request. Use @ syntax to include files (e.g., '@largefile.js explain what this does') or ask general questions"),
   changeMode: z.boolean().default(false).describe("Enable structured change mode - formats prompts to prevent tool errors and returns structured edit suggestions that Claude can apply directly"),
+  thinkingLevel: z.enum(['MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional().describe("Thinking/reasoning depth. Default: MEDIUM (balanced). Use HIGH for complex tasks (code review, multi-step planning, debugging, math, architecture decisions). Use MINIMAL/LOW for simple Q&A or formatting where speed matters"),
   chunkIndex: z.union([z.number(), z.string()]).optional().describe("Which chunk to return (1-based)"),
   chunkCacheKey: z.string().optional().describe("Optional cache key for continuation"),
 });
 
 export const askGeminiTool: UnifiedTool = {
   name: "ask-gemini",
-  description: "Query Gemini (gemini-3-pro-preview).",
+  description: "Query Gemini (gemini-3.1-pro-preview, thinking: MEDIUM default, HIGH for complex tasks). Fail-closed: no silent fallback.",
   zodSchema: askGeminiArgsSchema,
   prompt: {
     description: "Query Gemini for analysis, code review, or general questions. Supports changeMode for structured edit suggestions.",
   },
   category: 'gemini',
   execute: async (args, onProgress) => {
-    const { prompt, changeMode, chunkIndex, chunkCacheKey } = args;
+    const { prompt, changeMode, thinkingLevel, chunkIndex, chunkCacheKey } = args;
 
     if (!prompt?.trim()) { throw new Error(ERROR_MESSAGES.NO_PROMPT_PROVIDED); }
 
@@ -40,6 +41,7 @@ export const askGeminiTool: UnifiedTool = {
       {
         changeMode: !!changeMode,
         onProgress,
+        thinkingLevel: thinkingLevel as 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH' | undefined,
       }
     );
 

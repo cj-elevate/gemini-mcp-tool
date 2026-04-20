@@ -1,9 +1,10 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel as SDKThinkingLevel } from '@google/genai';
 import { readFileSync, existsSync, realpathSync, statSync } from 'fs';
 import { resolve, extname } from 'path';
 import { Logger } from './logger.js';
 import {
   ERROR_MESSAGES,
+  ERROR_CODES,
   STATUS_MESSAGES,
   MODELS,
   SDK,
@@ -172,26 +173,84 @@ ${userPrompt}
 }
 
 // ---------------------------------------------------------------------------
-// Error classification
+// Error classification — fail-closed, no silent fallback
+// ---------------------------------------------------------------------------
+
+export type ThinkingLevel = 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
+
+/**
+ * Classify a Gemini API error into a stable error code for machine detection.
+ * Returns [code, retryable, actionMessage].
+ */
+export function classifyError(error: unknown): {
+  code: string;
+  retryable: boolean;
+  message: string;
+} {
+  const msg = error instanceof Error ? error.message : String(error);
+  const status = (typeof error === 'object' && error !== null && 'status' in error)
+    ? (error as { status: number }).status
+    : undefined;
+
+  // Check rateLimitExceeded BEFORE generic 429 to distinguish rate limiting from quota exhaustion
+  if (msg.includes(ERROR_MESSAGES.RATE_LIMITED)) {
+    return {
+      code: ERROR_CODES.RATE_LIMITED,
+      retryable: true,
+      message: `[${ERROR_CODES.RATE_LIMITED}] Gemini rate limit hit for ${MODELS.PRO}. Retry after a brief pause.`,
+    };
+  }
+  if (msg.includes(ERROR_MESSAGES.RESOURCE_EXHAUSTED) || msg.includes('429') || status === 429) {
+    return {
+      code: ERROR_CODES.QUOTA_EXHAUSTED,
+      retryable: true,
+      message: `[${ERROR_CODES.QUOTA_EXHAUSTED}] Gemini quota exceeded for ${MODELS.PRO}. No fallback attempted. Wait and retry, or check Google AI quota limits.`,
+    };
+  }
+  if (msg.includes(ERROR_MESSAGES.UNAVAILABLE) || msg.includes('503') || msg.includes('500') || status === 503 || status === 500) {
+    return {
+      code: ERROR_CODES.OVERLOADED,
+      retryable: true,
+      message: `[${ERROR_CODES.OVERLOADED}] Gemini API is currently overloaded or unavailable. Retry later.`,
+    };
+  }
+  if (msg.includes(ERROR_MESSAGES.UNAUTHENTICATED) || msg.includes(ERROR_MESSAGES.PERMISSION_DENIED) ||
+      msg.includes('401') || msg.includes('403') || status === 401 || status === 403) {
+    return {
+      code: ERROR_CODES.AUTH_FAILED,
+      retryable: false,
+      message: `[${ERROR_CODES.AUTH_FAILED}] Gemini authentication or permission failed. Check API key configuration.`,
+    };
+  }
+  if (msg.includes('timed out') || msg.includes('abort')) {
+    return {
+      code: ERROR_CODES.TIMEOUT,
+      retryable: true,
+      message: `[${ERROR_CODES.TIMEOUT}] Gemini request timed out. The model may be under heavy load.`,
+    };
+  }
+  return {
+    code: ERROR_CODES.UNKNOWN,
+    retryable: false,
+    message: `[${ERROR_CODES.UNKNOWN}] Gemini request failed: ${msg}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Thinking config — Gemini 3+ only, thinkingLevel API
 // ---------------------------------------------------------------------------
 
 /**
- * Check if an error is a quota/rate limit error that should trigger fallback.
+ * Build thinkingConfig for Gemini 3+ models.
+ * Default: MEDIUM for balanced speed/quality. Callers should override to HIGH
+ * for complex tasks (code review, multi-step planning, debugging, math).
+ * HIGH adds 90-180s latency and higher cost — reserve for tasks that need it.
  */
-function isQuotaError(error: unknown): boolean {
-  if (error instanceof Error) {
-    const msg = error.message;
-    return (
-      msg.includes(ERROR_MESSAGES.RESOURCE_EXHAUSTED) ||
-      msg.includes(ERROR_MESSAGES.RATE_LIMITED) ||
-      msg.includes('429')
-    );
-  }
-  // Check if it has a status property (SDK APIError)
-  if (typeof error === 'object' && error !== null && 'status' in error) {
-    return (error as { status: number }).status === 429;
-  }
-  return false;
+export function buildThinkingConfig(
+  thinkingLevel?: ThinkingLevel,
+): { thinkingLevel: SDKThinkingLevel } {
+  // Map our string literals to SDK enum values (they match by string)
+  return { thinkingLevel: (thinkingLevel ?? 'MEDIUM') as SDKThinkingLevel };
 }
 
 // ---------------------------------------------------------------------------
@@ -201,20 +260,20 @@ function isQuotaError(error: unknown): boolean {
 /**
  * Stream-generate content from Gemini SDK and collect response text.
  * Reports progress via callback as chunks arrive.
- * Includes a timeout (TIMEOUTS.GEMINI_REQUEST) to prevent hung requests.
+ * Fail-closed: errors propagate with stable error codes, no silent fallback.
  */
 async function streamGenerate(
   ai: GoogleGenAI,
   model: string,
   prompt: string,
   onProgress?: (newOutput: string) => void,
+  thinkingLevel?: ThinkingLevel,
 ): Promise<string> {
-  const startTime = Date.now();
-  Logger.debug(`SDK request: model=${model}, prompt=${prompt.length} chars`);
+  const thinkingConfig = buildThinkingConfig(thinkingLevel);
 
-  // AbortController for total request duration (connection + streaming).
-  // httpOptions.timeout only covers the initial HTTP connection, not the
-  // full streaming read. This ensures hung streams are killed.
+  const startTime = Date.now();
+  Logger.debug(`SDK request: model=${model}, prompt=${prompt.length} chars, thinking=${JSON.stringify(thinkingConfig)}, timeout=${TIMEOUTS.GEMINI_REQUEST}ms`);
+
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), TIMEOUTS.GEMINI_REQUEST);
 
@@ -225,6 +284,7 @@ async function streamGenerate(
       config: {
         abortSignal: controller.signal,
         httpOptions: { timeout: TIMEOUTS.GEMINI_REQUEST },
+        thinkingConfig,
       },
     });
 
@@ -260,13 +320,15 @@ async function streamGenerate(
 
 /**
  * Execute a prompt against the Gemini API via the @google/genai SDK.
- * Replaces the old executeGeminiCLI which used child_process.spawn.
+ *
+ * FAIL-CLOSED: No silent model fallback. If the request fails, it throws
+ * a classified error with a stable error code prefix for machine detection.
  *
  * Handles:
  * - @filepath preprocessing (reads files inline)
  * - changeMode prompt wrapping
  * - Streaming with onProgress callbacks
- * - Quota fallback (PRO -> FLASH)
+ * - Thinking config (thinkingLevel, default MEDIUM)
  */
 export async function executeGemini(
   prompt: string,
@@ -274,9 +336,10 @@ export async function executeGemini(
     model?: string;
     changeMode?: boolean;
     onProgress?: (newOutput: string) => void;
+    thinkingLevel?: ThinkingLevel;
   }
 ): Promise<string> {
-  const { model, changeMode, onProgress } = options ?? {};
+  const { model, changeMode, onProgress, thinkingLevel } = options ?? {};
   const ai = getClient();
 
   let processedPrompt = prompt;
@@ -300,29 +363,16 @@ export async function executeGemini(
     model: targetModel,
     promptLength: processedPrompt.length,
     changeMode: !!changeMode,
+    thinkingLevel: thinkingLevel ?? 'MEDIUM',
   });
 
   try {
-    return await streamGenerate(ai, targetModel, processedPrompt, onProgress);
+    return await streamGenerate(ai, targetModel, processedPrompt, onProgress, thinkingLevel);
   } catch (error) {
-    // Quota/rate limit fallback: retry with FLASH model
-    if (isQuotaError(error) && targetModel !== MODELS.FLASH) {
-      Logger.warn(`Quota exceeded for ${targetModel}. Falling back to ${MODELS.FLASH}.`);
-      onProgress?.(STATUS_MESSAGES.FLASH_RETRY);
-
-      try {
-        const result = await streamGenerate(ai, MODELS.FLASH, processedPrompt, onProgress);
-        Logger.warn(`Successfully executed with ${MODELS.FLASH} fallback.`);
-        onProgress?.(STATUS_MESSAGES.FLASH_SUCCESS);
-        return result;
-      } catch (fallbackError) {
-        const msg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-        throw new Error(
-          `${targetModel} quota exceeded, ${MODELS.FLASH} fallback also failed: ${msg}`
-        );
-      }
-    }
-    throw error;
+    // Classify and rethrow with stable error code — no fallback
+    const classified = classifyError(error);
+    Logger.error(`Gemini request failed: ${classified.code}`, { model: targetModel, retryable: classified.retryable });
+    throw new Error(classified.message);
   }
 }
 
