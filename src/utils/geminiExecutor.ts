@@ -366,14 +366,32 @@ export async function executeGemini(
     thinkingLevel: thinkingLevel ?? 'MEDIUM',
   });
 
-  try {
-    return await streamGenerate(ai, targetModel, processedPrompt, onProgress, thinkingLevel);
-  } catch (error) {
-    // Classify and rethrow with stable error code — no fallback
-    const classified = classifyError(error);
-    Logger.error(`Gemini request failed: ${classified.code}`, { model: targetModel, retryable: classified.retryable });
-    throw new Error(classified.message);
+  const MAX_RETRIES = 2;
+  const BASE_DELAY_MS = 1000;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await streamGenerate(ai, targetModel, processedPrompt, onProgress, thinkingLevel);
+    } catch (error) {
+      const classified = classifyError(error);
+
+      if (classified.retryable && attempt < MAX_RETRIES) {
+        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt);
+        Logger.warn(`Gemini request failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delayMs}ms`, {
+          model: targetModel, code: classified.code,
+        });
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      Logger.error(`Gemini request failed: ${classified.code}`, {
+        model: targetModel, retryable: classified.retryable, attempts: attempt + 1,
+      });
+      throw new Error(classified.message);
+    }
   }
+
+  throw new Error('Unreachable');
 }
 
 // ---------------------------------------------------------------------------
