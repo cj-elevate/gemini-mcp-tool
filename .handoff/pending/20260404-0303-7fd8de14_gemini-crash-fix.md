@@ -2,18 +2,28 @@
 type: handoff
 project: gemini-mcp
 session_id: 20260404-0303-7fd8de14
-created: 2026-04-04T03:03:00Z
+created: '2026-04-04T03:03:00Z'
 status: in_progress
+schema_version: 2
 lifecycle_state: active
 workstream: main
 phase: maintenance
 updated: 2026-04-03 23:03 ET
 next_action: Monitor MCP-006 — verify crash handlers capture next Gemini failure with full stack trace
 blocker: none
+context_summary: 'Fixed intermittent gemini-cli STDIO crashes during /team consult. Two fixes: bumped proxy inactivityTimeoutMs
+  90s->180s, added process-level crash handlers (unhandledRejection + uncaughtException) to gemini-mcp. Debug session MCP-006
+  filed.'
+hot_files:
+- D:/servers/gemini-mcp/src/index.ts
+- D:/servers/gemini-mcp/src/index.test.ts
+- D:/servers/gemini-mcp/src/utils/geminiExecutor.ts
+- D:/servers/gemini-mcp/src/constants.ts
+- D:/servers/master-mcp-server/src/types/config.ts
 routing:
   method: explicit
   confidence: high
-  score: 1.00
+  score: 1.0
   signals:
     recency: 1.0
     git_dirty: 1.0
@@ -21,19 +31,13 @@ routing:
     active_plan: 0.0
     has_handoff_dir: 1.0
   runner_up: none
-hot_files:
-  - D:/servers/gemini-mcp/src/index.ts
-  - D:/servers/gemini-mcp/src/index.test.ts
-  - D:/servers/gemini-mcp/src/utils/geminiExecutor.ts
-  - D:/servers/gemini-mcp/src/constants.ts
-  - D:/servers/master-mcp-server/src/types/config.ts
-context_summary: "Fixed intermittent gemini-cli STDIO crashes during /team consult. Two fixes: bumped proxy inactivityTimeoutMs 90s->180s, added process-level crash handlers (unhandledRejection + uncaughtException) to gemini-mcp. Debug session MCP-006 filed."
 review:
   score: 0
   tier: info
   action: reviewed
   reviewed_by: codex,gemini
-schema_version: 1
+migrated_from: 1
+migrated_at: '2026-05-09T05:54:08.597810Z'
 ---
 
 # You Are Here
