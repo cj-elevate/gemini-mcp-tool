@@ -1,6 +1,0 @@
-version: 2
-phase: API key configured, cost tracking planned
-active_plan: none
-last_activity: 2026-04-04T05:52:29Z
-last_file: src\tools\ask-gemini.tool.ts
-task_description: Reading ask-gemini.tool.ts
