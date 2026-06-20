@@ -176,7 +176,7 @@ ${userPrompt}
 // Error classification — fail-closed, no silent fallback
 // ---------------------------------------------------------------------------
 
-export type ThinkingLevel = 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH';
+export type ThinkingLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
 /**
  * Classify a Gemini API error into a stable error code for machine detection.
@@ -247,10 +247,12 @@ export function classifyError(error: unknown): {
  * HIGH adds 90-180s latency and higher cost — reserve for tasks that need it.
  */
 export function buildThinkingConfig(
-  thinkingLevel?: ThinkingLevel,
+  thinkingLevel?: ThinkingLevel | string,
 ): { thinkingLevel: SDKThinkingLevel } {
-  // Map our string literals to SDK enum values (they match by string)
-  return { thinkingLevel: (thinkingLevel ?? 'MEDIUM') as SDKThinkingLevel };
+  let level = thinkingLevel ?? 'MEDIUM';
+  // MINIMAL is not supported on gemini-3.1-pro; remap to LOW for backward compat
+  if (level === 'MINIMAL') level = 'LOW';
+  return { thinkingLevel: level as SDKThinkingLevel };
 }
 
 // ---------------------------------------------------------------------------

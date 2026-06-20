@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyError } from './geminiExecutor.js'
+import { classifyError, buildThinkingConfig } from './geminiExecutor.js'
 
 describe('classifyError', () => {
   it('classifies OVERLOADED as retryable', () => {
@@ -30,5 +30,21 @@ describe('classifyError', () => {
     const result = classifyError(new Error('something random'))
     expect(result.code).toBe('GEMINI_ERROR')
     expect(result.retryable).toBe(false)
+  })
+})
+
+describe('buildThinkingConfig', () => {
+  it('defaults to MEDIUM when no level provided', () => {
+    expect(buildThinkingConfig().thinkingLevel).toBe('MEDIUM')
+  })
+
+  it('passes through LOW/MEDIUM/HIGH unchanged', () => {
+    expect(buildThinkingConfig('LOW').thinkingLevel).toBe('LOW')
+    expect(buildThinkingConfig('MEDIUM').thinkingLevel).toBe('MEDIUM')
+    expect(buildThinkingConfig('HIGH').thinkingLevel).toBe('HIGH')
+  })
+
+  it('remaps MINIMAL to LOW for backward compat', () => {
+    expect(buildThinkingConfig('MINIMAL' as any).thinkingLevel).toBe('LOW')
   })
 })
